@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Trader Dashboard - Mua Bán Ngoại Tệ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    </head>
+<body>
+    <header class="dashboard-header">
+        <div class="logo-container">
+            <div class="logo"></div> 
+            <div class="welcome-text">Xin chào, {{ session['user_id'] }} (Đầu Mối)</div>
+        </div>
+        
+        <nav>
+            <a href="{{ url_for('trader_dashboard') }}">Yêu Cầu Chờ</a>
+            <a href="{{ url_for('trader_blotter') }}">Blotter Giao Dịch</a>
+            <a href="{{ url_for('change_password') }}">Đổi Mật khẩu</a>
+            <a href="{{ url_for('login') }}">Đăng xuất</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <h2>Yêu Cầu MBNT Đang Chờ Xử Lý</h2>
+        </div>
+    
+    </body>
+</html>
