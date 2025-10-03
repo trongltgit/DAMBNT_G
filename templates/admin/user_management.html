@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Quản lý Người dùng</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* Tinh chỉnh CSS riêng cho Admin */
+        .user-table th { 
+            background-color: #dbe4ff; 
+            color: #40508c; 
+            font-size: 14px;
+        }
+        .import-section { 
+            border: 1px solid #bdc3c7; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-top: 25px; 
+            background-color: #f9f9f9; 
+        }
+        .file-upload-info {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+    </style>
+</head>
+<body>
+    <header class="dashboard-header">
+        <div class="logo-container">
+            <div class="logo"></div>
+            <div class="welcome-text">Xin chào, {{ session['user_id'] }} (Admin)</div>
+        </div>
+        <nav>
+            <a href="{{ url_for('admin_dashboard') }}">Quản lý User</a>
+            <a href="{{ url_for('change_password') }}">Đổi Mật khẩu</a>
+            <a href="{{ url_for('login') }}">Đăng xuất</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h2>Quản lý Người dùng Hệ thống</h2>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="import-section">
+            <h3>Nhập Người Dùng Lên Hệ Thống (Import CSV)</h3>
+            <div class="file-upload-info">
+                <p><strong>Mật khẩu mặc định:</strong> <code>{{ default_password }}</code></p>
+                <p><strong>Lưu ý:</strong> User không phải Admin sẽ bị **buộc đổi mật khẩu** khi đăng nhập lần đầu.</p>
+                <p><strong>Định dạng CSV (3 cột, không tiêu đề):</strong> <code>User_ID, Role, Department</code></p>
+                <p>Các vai trò hợp lệ: {% for role in valid_roles %} <code>{{ role }}</code> {% endfor %}</p>
+            </div>
+
+            <form action="{{ url_for('admin_import_users') }}" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="csv_file">Chọn file CSV:</label>
+                    <input type="file" id="csv_file" name="file" accept=".csv" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Import User</button>
+            </form>
+        </div>
+        
+        <hr style="margin: 40px 0;">
+
+        <h3>Danh Sách Người Dùng Hiện Tại (Tổng: {{ users|length }})</h3>
+        <div class="table-responsive">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Vai trò</th>
+                        <th>Phòng Ban</th>
+                        <th>Buộc Đổi Mật Khẩu?</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.user_id }}</td>
+                        <td><strong>{{ user.role|upper }}</strong></td>
+                        <td>{{ user.dept }}</td>
+                        <td>
+                            {% if user.needs_reset %}
+                                <span style="color: red; font-weight: bold;">CÓ</span>
+                            {% else %}
+                                <span style="color: green;">Không</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-warning" style="padding: 5px 10px;" onclick="alert('Tính năng Reset Mật khẩu sẽ được bổ sung.')">Reset Mật khẩu</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
