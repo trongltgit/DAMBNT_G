@@ -1,123 +1,103 @@
-from flask import Flask, request, redirect, url_for, session, render_template, jsonify
+import os
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask_cors import CORS
+from models import get_user_by_username
+from config import SECRET_KEY, DEFAULT_PASSWORD, DEFAULT_ADMIN_USERNAME
 from flask_bcrypt import Bcrypt
-from flask_cors import CORS 
-import time
-from datetime import timedelta
-from flask import after_this_request
 
-# Import cấu hình và mô hình 
-from config import SECRET_KEY, SESSION_TIMEOUT_SECONDS
-from models import USERS_DB, User 
-
-# --- APPLICATION INITIALIZATION ---
+# Cấu hình ứng dụng
 app = Flask(__name__)
-app.config['SECRET_KEY'] = SECRET_KEY
-# Đặt thời gian hết hạn session thành vĩnh viễn (cho đến khi logout hoặc hết thời gian timeout)
-app.permanent_session_lifetime = timedelta(seconds=SESSION_TIMEOUT_SECONDS)
-bcrypt = Bcrypt(app) 
-CORS(app) 
 
-# In thông tin mặc định khi khởi động server
-print(f"Server đã khởi động thành công.")
-print(f"User test: {', '.join(USERS_DB.keys())}")
+# Đặt khóa bí mật từ biến môi trường (BẮT BUỘC cho session)
+app.secret_key = SECRET_KEY 
 
+# Khởi tạo Bcrypt
+bcrypt = Bcrypt(app)
 
-# --- API LOGIN (AJAX HANDLER) ---
+# Cấu hình CORS để cho phép các yêu cầu từ mọi nguồn gốc (chế độ phát triển/API)
+# Trong môi trường sản xuất, nên giới hạn nguồn gốc cụ thể
+CORS(app)
+
+# ====================================================================
+# ROUTE GIAO DIỆN (UI)
+# ====================================================================
+
+@app.route('/', methods=['GET'])
+@app.route('/login', methods=['GET'])
+def login_page():
+    # Đảm bảo trình duyệt luôn tải lại trang mới, rất quan trọng cho các thay đổi UI
+    response = app.make_response(render_template('login.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/dashboard')
+def dashboard():
+    # Kiểm tra xem người dùng đã đăng nhập chưa
+    if 'logged_in' in session and session['logged_in']:
+        username = session.get('username', 'Admin')
+        return f"""
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Dashboard</title>
+            <style>
+                body {{ font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f9; }}
+                .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; }}
+                h1 {{ color: #0d9488; }}
+                p {{ color: #333; }}
+                .logout-btn {{ background-color: #ef4444; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; margin-top: 20px; display: inline-block; }}
+                .logout-btn:hover {{ background-color: #dc2626; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Chào mừng, {username}!</h1>
+                <p>Bạn đã đăng nhập vào Hệ thống MBNT thành công trên Render.</p>
+                <a href="{url_for('logout')}" class="logout-btn">Đăng xuất</a>
+            </div>
+        </body>
+        </html>
+        """
+    return redirect(url_for('login_page'))
+
+# ====================================================================
+# ROUTE API ĐĂNG NHẬP
+# ====================================================================
+
 @app.route('/api/auth/login', methods=['POST'])
 def api_login():
-    """Xử lý đăng nhập qua API (Fetch/AJAX)"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"success": False, "message": "Yêu cầu phải là JSON."}), 400
-
-        user_id = data.get('username')
-        password = data.get('password')
-
-        user = USERS_DB.get(user_id)
-
-        # 1. Xác thực mật khẩu 
-        if user and user.check_password(password):
-            
-            # 2. Tạo Session
-            session.permanent = True
-            session['user_id'] = user.user_id
-            session['role'] = user.role
-            session['last_activity'] = time.time() 
-
-            # 3. Xác định trang chuyển hướng 
-            if user.needs_reset:
-                next_url = url_for('change_password', _external=True)
-            elif user.role == 'admin':
-                next_url = url_for('admin_dashboard', _external=True)
-            elif user.role == 'dau_moi':
-                next_url = url_for('trader_dashboard', _external=True)
-            elif user.role == 'phong':
-                next_url = url_for('client_dashboard', _external=True)
-            else:
-                next_url = url_for('login', _external=True)
-
-            return jsonify({
-                "success": True, 
-                "message": "Đăng nhập thành công!",
-                "user_id": user.user_id,
-                "role": user.role, 
-                "needs_reset": user.needs_reset,
-                "redirect_url": next_url
-            })
-        else:
-            return jsonify({"success": False, "message": "Sai tên đăng nhập hoặc mật khẩu."}), 401
-
-    except Exception as e:
-        print(f"Lỗi đăng nhập API: {e}")
-        return jsonify({"success": False, "message": "Lỗi hệ thống không xác định. Vui lòng kiểm tra terminal."}), 500
-
-# --- ROUTE GET /LOGIN (Hiển thị HTML) ---
-@app.route('/')
-@app.route('/login', methods=['GET'])
-def login():
-    """Hiển thị trang đăng nhập và xử lý chuyển hướng nếu đã đăng nhập"""
-    @after_this_request
-    def add_header(response):
-        # Đảm bảo trình duyệt không cache trang đăng nhập
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        return response
-
-    if 'user_id' in session and session.get('user_id') in USERS_DB:
-        user = USERS_DB[session['user_id']]
-        if user.role == 'admin': return redirect(url_for('admin_dashboard'))
-        if user.role == 'dau_moi': return redirect(url_for('trader_dashboard'))
-        if user.role == 'phong': return redirect(url_for('client_dashboard'))
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
     
-    return render_template('login.html')
+    # 1. Lấy thông tin người dùng
+    user = get_user_by_username(username)
+    
+    if user:
+        # 2. Kiểm tra mật khẩu bằng Bcrypt
+        # So sánh password người dùng nhập (chuỗi) với password đã hash trong DB (user['password_hash'])
+        if bcrypt.check_password_hash(user['password_hash'], password):
+            session['logged_in'] = True
+            session['username'] = username
+            # 3. Trả về thành công
+            return jsonify({'success': True, 'redirect': url_for('dashboard')}), 200
+        else:
+            # 4. Sai mật khẩu
+            return jsonify({'success': False, 'message': 'Sai tên đăng nhập hoặc mật khẩu.'}), 401
+    else:
+        # 5. Sai tên đăng nhập
+        return jsonify({'success': False, 'message': 'Sai tên đăng nhập hoặc mật khẩu.'}), 401
 
-# --- HÀM HỖ TRỢ ĐĂNG XUẤT và DASHBOARD GIẢ LẬP ---
-@app.route('/logout', methods=['GET'])
+@app.route('/logout')
 def logout():
-    # Xóa hoàn toàn session
-    session.clear() 
-    return redirect(url_for('login'))
-
-@app.route('/admin/dashboard')
-def admin_dashboard():
-    if session.get('role') != 'admin': return redirect(url_for('login'))
-    return f"<h1>Admin Dashboard</h1><p>Chào mừng Admin {session.get('user_id')}.</p><a href='{url_for('logout')}'>Đăng xuất</a>"
-
-@app.route('/trader/dashboard')
-def trader_dashboard():
-    if session.get('role') != 'dau_moi': return redirect(url_for('login'))
-    return f"<h1>Trader Dashboard</h1><p>Chào mừng Trader {session.get('user_id')}.</p><a href='{url_for('logout')}'>Đăng xuất</a>"
-
-@app.route('/client/dashboard')
-def client_dashboard():
-    if session.get('role') != 'phong': return redirect(url_for('login'))
-    return f"<h1>Client Dashboard</h1><p>Chào mừng Client {session.get('user_id')}.</p><a href='{url_for('logout')}'>Đăng xuất</a>"
-
-@app.route('/change-password')
-def change_password():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    return f"<h1>Đổi Mật khẩu Lần đầu</h1><p>Chào mừng {session.get('user_id')}. Vui lòng đổi mật khẩu.</p><a href='{url_for('logout')}'>Đăng xuất</a>"
-
+    session.clear()
+    return redirect(url_for('login_page'))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Trong Render, Gunicorn sẽ chạy ứng dụng này, nên dòng này không cần thiết
+    # Tuy nhiên, vẫn giữ lại để test local
+    app.run(debug=True, host='0.0.0.0')
