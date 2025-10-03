@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Blotter Giao Dịch - Hệ thống MBNT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .blotter-table th { 
+            background-color: #f7f9f9; 
+            color: #34495e; 
+            font-size: 14px;
+        }
+        .blotter-table td {
+            font-size: 14px;
+        }
+        .blotter-action-buy { color: #1e8449; font-weight: bold; } /* Màu xanh lá cho Mua */
+        .blotter-action-sell { color: #c0392b; font-weight: bold; } /* Màu đỏ cho Bán */
+    </style>
+</head>
+<body>
+    <header class="dashboard-header">
+        <div class="logo-container">
+            <div class="logo"></div> 
+            <div class="welcome-text">Xin chào, {{ session['user_id'] }} (Đầu Mối)</div>
+        </div>
+        
+        <nav>
+            <a href="{{ url_for('trader_dashboard') }}">Yêu Cầu Chờ</a>
+            <a href="{{ url_for('trader_blotter') }}">Blotter Giao Dịch</a>
+            <a href="{{ url_for('change_password') }}">Đổi Mật khẩu</a>
+            <a href="{{ url_for('login') }}">Đăng xuất</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h2>Blotter Giao Dịch (Sổ Ghi Nhận)</h2>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <p>Hiển thị tổng cộng: <strong>{{ blotter_entries|length }} giao dịch</strong></p>
+            <div>
+                <button class="btn btn-primary" onclick="alert('Chức năng Lọc đang được phát triển')">Lọc Dữ Liệu</button>
+                <button class="btn btn-warning" onclick="alert('Chức năng Xuất Excel đang được phát triển')">Xuất Excel</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="blotter-table">
+                <thead>
+                    <tr>
+                        <th>Deal ID</th>
+                        <th>Thời gian Chốt</th>
+                        <th>Phòng Ban</th>
+                        <th>Cặp Tiền</th>
+                        <th>Hành động</th>
+                        <th>Số lượng</th>
+                        <th>Tỷ giá Chốt</th>
+                        <th>Trader</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deal in blotter_entries %}
+                    <tr>
+                        <td>{{ deal.deal_id[:8] }}...</td>
+                        <td>{{ deal.timestamp|default("N/A") }}</td>
+                        <td>{{ deal.dept }}</td>
+                        <td>{{ deal.pair }}</td>
+                        <td class="blotter-action-{{ 'buy' if deal.action == 'Mua' else 'sell' }}">
+                            {{ deal.action }}
+                        </td>
+                        <td>{{ "{:,.0f}".format(deal.amount|float) }}</td>
+                        <td>{{ "{:,.4f}".format(deal.price_chot|float) }}</td>
+                        <td>{{ deal.trader_id }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
