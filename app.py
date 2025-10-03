@@ -18,13 +18,15 @@ CORS(app)
 
 @app.route('/')
 def home():
-    """Route gốc: Chuyển hướng người dùng đến trang đăng nhập."""
-    # Nếu người dùng đã đăng nhập, có thể chuyển hướng đến trang dashboard hoặc home thực tế
-    if 'logged_in' in session and session['logged_in']:
-        # Hiện tại chưa có trang dashboard, nên ta giữ họ ở trang login (hoặc redirect tùy ý)
-        return "Chào mừng đến với trang MBNT (Đã đăng nhập)!"
+    """Route gốc: Xóa session và chuyển hướng người dùng đến trang đăng nhập."""
+    # Xóa bất kỳ session đăng nhập nào hiện có để người dùng thấy giao diện đăng nhập
+    # Điều này khắc phục lỗi tự động hiển thị "Đã đăng nhập!"
+    if 'logged_in' in session:
+        session.pop('logged_in', None)
+    if 'username' in session:
+        session.pop('username', None)
     
-    # Nếu chưa đăng nhập, chuyển hướng đến trang đăng nhập
+    # Luôn chuyển hướng đến trang đăng nhập khi truy cập gốc
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET'])
